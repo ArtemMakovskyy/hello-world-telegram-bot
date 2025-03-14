@@ -18,10 +18,8 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 @Slf4j
 public class TelegramBotNotificationService extends TelegramLongPollingBot {
     public static final String COMMAND_START = "/start";
-    public static final String CALLBACK_DATA_MANU1_BUTTON1 = "menu1_button1";
-    public static final String CALLBACK_DATA_MANU1_BUTTON2 = "menu1_button2";
-    public static final String CALLBACK_DATA_MANU2_BUTTON1 = "menu2_button1";
-    public static final String CALLBACK_DATA_MANU2_BUTTON2 = "menu2_button2";
+    public static final String CALLBACK_DATA_BUTTON1 = "button1";
+    public static final String CALLBACK_DATA_BUTTON2 = "button2";
     public static final String CALLBACK_DATA_MENU1_NEXT_BUTTON = "menu1_next";
     public static final String CALLBACK_DATA_MENU2_BACK_BUTTON = "menu2_back";
     public static final String BUTTON_TEXT1 = "Кнопка 1";
@@ -49,7 +47,7 @@ public class TelegramBotNotificationService extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
 
-            handleCallbackTextMessages(messageText, chatId);
+            handleTextMessage(messageText, chatId);
         } else if (update.hasCallbackQuery()) {
             String callbackData = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
@@ -58,32 +56,25 @@ public class TelegramBotNotificationService extends TelegramLongPollingBot {
         }
     }
 
-    private void handleCallbackTextMessages(String messageText, long chatId) {
+    private void handleTextMessage(String messageText, long chatId) {
         log.info("Received text message: '{}' from chatId: {}", messageText, chatId);
 
         if (COMMAND_START.equals(messageText)) {
-            sendMenu(chatId, BUTTON_TEXT_MENU1, buildMenu1());
+            sendMenu(chatId, BUTTON_TEXT_MENU1, buildMenu("menu1"));
         }
     }
 
     private void handleCallbackData(String callbackData, long chatId) {
-        switch (callbackData) {
-            case CALLBACK_DATA_MANU1_BUTTON1:
-            case CALLBACK_DATA_MANU2_BUTTON1:
-                sendMessage(chatId, BUTTON_TEXT1, null);
-                break;
-            case CALLBACK_DATA_MANU1_BUTTON2:
-            case CALLBACK_DATA_MANU2_BUTTON2:
-                sendMessage(chatId, BUTTON_TEXT2, null);
-                break;
-            case CALLBACK_DATA_MENU1_NEXT_BUTTON:
-                sendMenu(chatId, BUTTON_TEXT_MENU2, buildMenu2());
-                break;
-            case CALLBACK_DATA_MENU2_BACK_BUTTON:
-                sendMenu(chatId, BUTTON_TEXT_MENU1, buildMenu1());
-                break;
-            default:
-                log.warn("Unknown callbackData: {}", callbackData);
+        if (callbackData.startsWith(CALLBACK_DATA_BUTTON1)) {
+            sendMessage(chatId, BUTTON_TEXT1, null);
+        } else if (callbackData.startsWith(CALLBACK_DATA_BUTTON2)) {
+            sendMessage(chatId, BUTTON_TEXT2, null);
+        } else {
+            switch (callbackData) {
+                case CALLBACK_DATA_MENU1_NEXT_BUTTON -> sendMenu(chatId, BUTTON_TEXT_MENU2, buildMenu("menu2"));
+                case CALLBACK_DATA_MENU2_BACK_BUTTON -> sendMenu(chatId, BUTTON_TEXT_MENU1, buildMenu("menu1"));
+                default -> log.warn("Unknown callbackData: {}", callbackData);
+            }
         }
     }
 
@@ -105,32 +96,19 @@ public class TelegramBotNotificationService extends TelegramLongPollingBot {
         }
     }
 
-    private List<List<InlineKeyboardButton>> buildMenu1() {
+    private List<List<InlineKeyboardButton>> buildMenu(String menuType) {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = List.of(
-                createButton(BUTTON_TEXT1, CALLBACK_DATA_MANU1_BUTTON1),
-                createButton(BUTTON_TEXT2, CALLBACK_DATA_MANU1_BUTTON2)
-        );
-        List<InlineKeyboardButton> row2 = List.of(
-                createButton(BUTTON_TEXT_NEXT, CALLBACK_DATA_MENU1_NEXT_BUTTON)
+                createButton(BUTTON_TEXT1, CALLBACK_DATA_BUTTON1 + "_" + menuType),
+                createButton(BUTTON_TEXT2, CALLBACK_DATA_BUTTON2 + "_" + menuType)
         );
 
-        keyboard.add(row1);
-        keyboard.add(row2);
-        return keyboard;
-    }
-
-    private List<List<InlineKeyboardButton>> buildMenu2() {
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-
-        List<InlineKeyboardButton> row1 = List.of(
-                createButton(BUTTON_TEXT1, CALLBACK_DATA_MANU2_BUTTON1),
-                createButton(BUTTON_TEXT2, CALLBACK_DATA_MANU2_BUTTON2)
-        );
-        List<InlineKeyboardButton> row2 = List.of(
-                createButton(BUTTON_TEXT_BACK, CALLBACK_DATA_MENU2_BACK_BUTTON)
-        );
+        List<InlineKeyboardButton> row2 = switch (menuType) {
+            case "menu1" -> List.of(createButton(BUTTON_TEXT_NEXT, CALLBACK_DATA_MENU1_NEXT_BUTTON));
+            case "menu2" -> List.of(createButton(BUTTON_TEXT_BACK, CALLBACK_DATA_MENU2_BACK_BUTTON));
+            default -> throw new IllegalArgumentException("Unknown menu type: " + menuType);
+        };
 
         keyboard.add(row1);
         keyboard.add(row2);
